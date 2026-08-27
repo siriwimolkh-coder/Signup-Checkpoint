@@ -226,59 +226,52 @@
     });
   }
 
-  document.getElementById('memberForm').addEventListener('submit', function (e) {
-    e.preventDefault();
-    if (!currentUserId) {
-      var statusEl = document.getElementById('signupStatus');
-      statusEl.textContent = 'กำลังเชื่อมต่อ LINE กรุณารอสักครู่แล้วลองใหม่';
-      statusEl.className = 'error';
-      return;
-    }
+ // วางแทนบล็อก document.getElementById('memberForm').addEventListener('submit', ...) เดิมทั้งหมด
 
-    var data = {
-      userId: currentUserId,
-      name: document.getElementById('fldName').value,
-      address: document.getElementById('fldAddress').value,
-      phone: document.getElementById('fldPhone').value
-    };
+// แก้เป็น URL เว็บแอปส์ที่ได้จากตอน Deploy > New deployment ใน Apps Script
+const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxd4rCTLFJaVju73VT1a3HBtSEmDvx-mkYn2o3OngKtl-4UUZ-LFVJwL4c22I58bVnM0g/exec';
 
-    var btn = document.getElementById('submitBtn');
-    var statusEl = document.getElementById('signupStatus');
-    btn.disabled = true;
-    btn.textContent = 'กำลังบันทึก...';
-    statusEl.textContent = '';
-    statusEl.className = '';
+document.getElementById('memberForm').addEventListener('submit', function(e) {
+  e.preventDefault();
 
-    fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(data)
+  if (!userId) {
+    setStatus('กำลังเชื่อมต่อ LINE กรุณารอสักครู่แล้วลองใหม่', true);
+    return;
+  }
+
+  var data = {
+    userId: userId,
+    name: document.getElementById('fldName').value,
+    address: document.getElementById('fldAddress').value,
+    phone: document.getElementById('fldPhone').value
+  };
+
+  btn.disabled = true;
+  btn.textContent = 'กำลังบันทึก...';
+  setStatus('');
+
+  fetch(WEBAPP_URL, {
+    method: 'POST',
+    // ใช้ text/plain แทน application/json เพื่อเลี่ยงปัญหา CORS preflight
+    // (Apps Script ยังอ่าน e.postData.contents เป็น JSON ได้ปกติฝั่ง doPost)
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(data)
+  })
+    .then(function(res) { return res.json(); })
+    .then(function(result) {
+      if (result.status === 'error') throw new Error(result.message);
+      btn.textContent = 'เข้าร่วมสำเร็จ ✓';
+      setStatus('บันทึกข้อมูลเรียบร้อย กำลังปิดหน้าต่าง...');
+      setTimeout(function() {
+        if (liff.isInClient()) { liff.closeWindow(); }
+      }, 1200);
     })
-      .then(function (res) { return res.json(); })
-      .then(function (result) {
-        if (!result.ok) throw new Error(result.error || 'บันทึกไม่สำเร็จ');
-
-        if (result.status === 'already_registered') {
-          document.getElementById('memberForm').style.display = 'none';
-          document.getElementById('alreadyMemberBox').style.display = 'block';
-          document.getElementById('alreadyMemberDetail').textContent =
-            (result.name ? result.name + ' · ' : '') + (result.phone || '');
-          return;
-        }
-
-        btn.textContent = 'เข้าร่วมสำเร็จ ✓';
-        statusEl.textContent = 'บันทึกข้อมูลเรียบร้อย';
-        setTimeout(function () {
-          if (liff.isInClient()) { liff.closeWindow(); }
-        }, 1200);
-      })
-      .catch(function (err) {
-        btn.disabled = false;
-        btn.textContent = 'เข้าร่วมกิจกรรม';
-        statusEl.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
-        statusEl.className = 'error';
-      });
-  });
+    .catch(function(err) {
+      btn.disabled = false;
+      btn.textContent = 'เข้าร่วมกิจกรรม';
+      setStatus('เกิดข้อผิดพลาด: ' + err.message, true);
+    });
+});
 
   // ---------- เช็คแต้ม ----------
   function checkPoint() {
