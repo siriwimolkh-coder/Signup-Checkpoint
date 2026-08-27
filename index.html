@@ -131,10 +131,10 @@
 
 <script>
   // ⚠️ แก้ไขตรงนี้: LIFF ID ที่ใช้กับริชเมนูปุ่มนี้
-  var LIFF_ID = '2011055322-9zPuaduh'; // YOUR_LIFF_ID = กรอก LIFF ID ของคุณ
+  var LIFF_ID = '2011055322-9zPuaduh';
 
-  // ⚠️ แก้ไขตรงนี้: Web App URL เดียว จาก Deploy ของ Code.gs (ใช้ร่วมกันทั้งสมัครสมาชิกและเช็คแต้ม)
-  var API_URL = 'https://script.google.com/macros/s/AKfycbxd4rCTLFJaVju73VT1a3HBtSEmDvx-mkYn2o3OngKtl-4UUZ-LFVJwL4c22I58bVnM0g/exec'; // YOUR_API_URL = กรอก URL จาก Deploy ของ Code.gs
+  // Web App URL เดียว ใช้ร่วมกันทั้งสมัครสมาชิกและเช็คแต้ม
+  var API_URL = 'https://script.google.com/macros/s/AKfycbxd4rCTLFJaVju73VT1a3HBtSEmDvx-mkYn2o3OngKtl-4UUZ-LFVJwL4c22I58bVnM0g/exec';
 
   var currentUserId = null;
 
@@ -226,52 +226,54 @@
     });
   }
 
- // วางแทนบล็อก document.getElementById('memberForm').addEventListener('submit', ...) เดิมทั้งหมด
+  // ---------- ส่งฟอร์มสมัครสมาชิก (แก้แล้ว: ใช้ currentUserId / submitBtn / signupStatus ให้ตรงกับไฟล์นี้) ----------
+  document.getElementById('memberForm').addEventListener('submit', function (e) {
+    e.preventDefault();
 
-// แก้เป็น URL เว็บแอปส์ที่ได้จากตอน Deploy > New deployment ใน Apps Script
-const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxd4rCTLFJaVju73VT1a3HBtSEmDvx-mkYn2o3OngKtl-4UUZ-LFVJwL4c22I58bVnM0g/exec';
+    var submitBtn = document.getElementById('submitBtn');
+    var statusEl = document.getElementById('signupStatus');
 
-document.getElementById('memberForm').addEventListener('submit', function(e) {
-  e.preventDefault();
+    if (!currentUserId) {
+      statusEl.textContent = 'กำลังเชื่อมต่อ LINE กรุณารอสักครู่แล้วลองใหม่';
+      statusEl.className = 'error';
+      return;
+    }
 
-  if (!userId) {
-    setStatus('กำลังเชื่อมต่อ LINE กรุณารอสักครู่แล้วลองใหม่', true);
-    return;
-  }
+    var data = {
+      userId: currentUserId,
+      name: document.getElementById('fldName').value,
+      address: document.getElementById('fldAddress').value,
+      phone: document.getElementById('fldPhone').value
+    };
 
-  var data = {
-    userId: userId,
-    name: document.getElementById('fldName').value,
-    address: document.getElementById('fldAddress').value,
-    phone: document.getElementById('fldPhone').value
-  };
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'กำลังบันทึก...';
+    statusEl.textContent = '';
+    statusEl.className = '';
 
-  btn.disabled = true;
-  btn.textContent = 'กำลังบันทึก...';
-  setStatus('');
-
-  fetch(WEBAPP_URL, {
-    method: 'POST',
-    // ใช้ text/plain แทน application/json เพื่อเลี่ยงปัญหา CORS preflight
-    // (Apps Script ยังอ่าน e.postData.contents เป็น JSON ได้ปกติฝั่ง doPost)
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(data)
-  })
-    .then(function(res) { return res.json(); })
-    .then(function(result) {
-      if (result.status === 'error') throw new Error(result.message);
-      btn.textContent = 'เข้าร่วมสำเร็จ ✓';
-      setStatus('บันทึกข้อมูลเรียบร้อย กำลังปิดหน้าต่าง...');
-      setTimeout(function() {
-        if (liff.isInClient()) { liff.closeWindow(); }
-      }, 1200);
+    fetch(API_URL, {
+      method: 'POST',
+      // ใช้ text/plain แทน application/json เพื่อเลี่ยงปัญหา CORS preflight
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(data)
     })
-    .catch(function(err) {
-      btn.disabled = false;
-      btn.textContent = 'เข้าร่วมกิจกรรม';
-      setStatus('เกิดข้อผิดพลาด: ' + err.message, true);
-    });
-});
+      .then(function (res) { return res.json(); })
+      .then(function (result) {
+        // Savemember.gs ส่งกลับเป็น { ok: false, error: ... } ตอนพลาด ไม่ใช่ status: 'error'
+        if (!result.ok) throw new Error(result.error || 'บันทึกไม่สำเร็จ');
+        submitBtn.textContent = 'เข้าร่วมสำเร็จ ✓';
+        statusEl.textContent = 'บันทึกข้อมูลเรียบร้อย กำลังปิดหน้าต่าง...';
+        setTimeout(function () {
+          if (liff.isInClient()) { liff.closeWindow(); }
+        }, 1200);
+      })
+      .catch(function (err) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'เข้าร่วมกิจกรรม';
+        statusEl.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+        statusEl.className = 'error';
+      });
+  });
 
   // ---------- เช็คแต้ม ----------
   function checkPoint() {
